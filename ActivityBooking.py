@@ -36,7 +36,10 @@ if st.button("🔍 Search Places"):
     if activity.strip() and location.strip():
         st.info("Searching nearby places...")
 
-        url = f"https://nominatim.openstreetmap.org/search?format=json&q={activity} near {location}"
+        # Proper query string creation
+        search_query = f"{activity} in {location}, India"
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={search_query}"
+        
         headers = {"User-Agent": "ActivityBookingBuddyApp"}
         response = requests.get(url, headers=headers)
 
