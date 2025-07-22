@@ -1,47 +1,60 @@
 import streamlit as st
 import google.generativeai as genai
+import requests
 
-# Step 1: Configure Gemini API Key
+# Configure Gemini API (from your Streamlit secrets)
 genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
-
-# Step 2: Load Gemini Model
 model = genai.GenerativeModel('gemini-2.5-pro')
 
-# Step 3: Dummy dataset of activities (replace with real data later)
-activities = {
-    "art": "🎨 Art Class at Rainbow Arts Center - [Book Now](https://example.com/art-class)",
-    "football": "⚽ Football Coaching at Sports Hub - [Book Now](https://example.com/football)",
-    "dance": "💃 Dance Workshop at Star Studio - [Book Now](https://example.com/dance)",
-    "music": "🎸 Music Lessons at Melody Academy - [Book Now](https://example.com/music)"
-}
+# Streamlit App
+st.set_page_config(page_title="Activity Booking Buddy", page_icon="🎉")
+st.title("🎉 Activity Booking Buddy (with Gemini + OpenStreetMap)")
 
-# Step 4: Streamlit UI Setup
-st.set_page_config(page_title="🎉 Kids Activity Booking Buddy")
-st.title("🎉 Kids Activity Booking Buddy")
-st.write("Tell me what fun activity you'd like to join, and I'll help you book it!")
+st.write("💬 Chat with Gemini to get activity ideas, and search real places nearby!")
 
-# Step 5: Get User Query
-user_input = st.text_input("🎈 What activity are you looking for? (Example: I want football classes)")
+# Chat with Gemini for activity ideas
+user_question = st.text_input("💡 Ask Gemini: (E.g., Suggest fun outdoor activities for kids)")
 
-# Step 6: AI Processing & Response
-if st.button("🎟️ Find Activities"):
-    if user_input.strip():
-        with st.spinner("Finding activities for you..."):
-            # Gemini generates structured response
-            prompt = f"""
-            A child said: {user_input}.
-            Which activity matches this from: {list(activities.keys())}?
-            Reply with just the key like art, football, dance, or music.
-            """
-            response = model.generate_content(prompt)
-            detected_activity = response.text.strip().lower()
-
-            if detected_activity in activities:
-                st.success("🎉 Here's something fun for you!")
-                st.markdown(activities[detected_activity], unsafe_allow_html=True)
-            else:
-                st.warning("Oops! I couldn't find a matching activity. Please try again.")
+if st.button("Ask Gemini"):
+    if user_question.strip():
+        with st.spinner("Thinking..."):
+            response = model.generate_content(user_question)
+            st.write("🧠 Gemini says:")
+            st.write(response.text)
     else:
-        st.warning("Please type something first.")
+        st.warning("Please ask something!")
 
-st.caption("Made with ❤️ using Gemini AI and Streamlit.")
+st.write("---")
+
+# Real Places Search using OpenStreetMap (No API Key Needed)
+st.subheader("📍 Find Real Places Nearby")
+
+activity = st.text_input("🎨 What place are you looking for? (e.g. park, museum, swimming pool)")
+location = st.text_input("📍 Your City/Location:")
+
+if st.button("🔍 Search Places"):
+    if activity.strip() and location.strip():
+        st.info("Searching nearby places...")
+
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={activity} near {location}"
+        headers = {"User-Agent": "ActivityBookingBuddyApp"}
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                st.success(f"Found {len(data)} places!")
+
+                for place in data[:10]:  # Show top 10
+                    st.subheader(place.get("display_name"))
+                    lat, lon = place.get("lat"), place.get("lon")
+                    st.write(f"🌐 [View on Map](https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=16/{lat}/{lon})")
+                    st.write("---")
+            else:
+                st.warning("No places found. Try another search.")
+        else:
+            st.error("Something went wrong. Try again later.")
+    else:
+        st.warning("Please enter both activity and location.")
+
+st.caption("Built using Gemini + OpenStreetMap + Streamlit 🎈")
