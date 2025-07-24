@@ -1,76 +1,119 @@
-# app.py
-
+# --- Imports ---
 import streamlit as st
-import google.generativeai as genai
 from langgraph.graph import StateGraph
-from typing import TypedDict
-import datetime
+import google.generativeai as genai
+from datetime import date
 
-# ------------------ Gemini API Setup ------------------
-genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")  # Replace with your actual Gemini key
+# --- Gemini API Key ---
+genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
 model = genai.GenerativeModel("gemini-2.5-pro")
 
-# ------------------ LangGraph State ------------------
-class TravelState(TypedDict):
-    location: str
-    budget: str
-    travel_date: str
-    num_days: str
-    itinerary: str
+# --- Agent Functions ---
 
-# ------------------ Agent Function ------------------
-def itinerary_agent(state):
+# 1. Extract user input
+def extract_user_intent(state):
+    return {
+        "location": state["location"],
+        "budget": state["budget"],
+        "days": state["days"],
+        "date": state["date"]
+    }
+
+# 2. Suggest places using Gemini
+def suggest_places(state):
     location = state["location"]
-    budget = state["budget"]
-    travel_date = state["travel_date"]
-    num_days = state["num_days"]
+    prompt = f"Suggest top 5 tourist attractions in {location} for a family trip."
+    response = model.generate_content(prompt)
+    return {**state, "places": response.text}
 
-    prompt = f"""
-    Plan a {num_days}-day fun and family-friendly itinerary to {location}, starting from {travel_date}.
-    Keep it within a {budget} budget.
-    Include exciting activities, meals, and unique experiences for each day.
-    Make it engaging and easy to understand for kids.
-    """
+# 3. Budget advice agent
+def suggest_budget_options(state):
+    budget = int(state["budget"])
+    if budget < 10000:
+        options = "Budget stay, street food, shared transport."
+    elif budget < 30000:
+        options = "3-star hotels, local restaurants, guided tours."
+    else:
+        options = "Luxury hotels, fine dining, private cabs."
+    return {**state, "budget_tips": options}
 
-    itinerary = model.generate_content(prompt).text
-    state["itinerary"] = itinerary
-    return state
+# 4. Itinerary planner
+def create_itinerary(state):
+    days = int(state["days"])
+    itinerary = ""
+    for i in range(1, days + 1):
+        itinerary += f"Day {i}:\n - Morning: Visit local attractions\n - Afternoon: Lunch & shopping\n - Evening: Explore culture\n\n"
+    return {**state, "itinerary": itinerary}
 
-# ------------------ LangGraph Builder ------------------
-def build_graph():
-    builder = StateGraph(state_schema=TravelState)
-    builder.add_node("ItineraryAgent", itinerary_agent)
-    builder.set_entry_point("ItineraryAgent")
-    builder.set_finish_point("ItineraryAgent")
-    return builder.compile()
+# 5. Checklist generator
+def generate_checklist(state):
+    checklist = (
+        "✅ Travel Checklist:\n"
+        "- ID proof & tickets\n"
+        "- Clothes & toiletries\n"
+        "- Comfortable shoes\n"
+        "- Phone & charger\n"
+        "- Emergency medicines\n"
+        "- Sunglasses, sunscreen\n"
+    )
+    return {**state, "checklist": checklist}
 
-# ------------------ Streamlit UI ------------------
-st.set_page_config(page_title="🧠 AI Travel Itinerary Planner", layout="centered")
-st.title("🧳 AI Travel Booking Planner for Kids")
+# --- LangGraph Setup ---
+state_schema = dict  # basic dict for state
+builder = StateGraph(state_schema)
+
+# Add all agent nodes
+builder.add_node("UserIntent", extract_user_intent)
+builder.add_node("DestinationAgent", suggest_places)
+builder.add_node("BudgetAgent", suggest_budget_options)
+builder.add_node("ItineraryAgent", create_itinerary)
+builder.add_node("ChecklistAgent", generate_checklist)
+
+# Set flow of graph
+builder.set_entry_point("UserIntent")
+builder.add_edge("UserIntent", "DestinationAgent")
+builder.add_edge("DestinationAgent", "BudgetAgent")
+builder.add_edge("BudgetAgent", "ItineraryAgent")
+builder.add_edge("ItineraryAgent", "ChecklistAgent")
+builder.set_finish_point("ChecklistAgent")
+
+# Compile the graph
+travel_planner_graph = builder.compile()
+
+# --- Streamlit Frontend ---
+st.set_page_config(page_title="AI Travel Planner", page_icon="✈️")
+st.title("✈️ AI Travel Booking Planner")
+st.markdown("Let AI plan your next amazing trip!")
 
 with st.form("travel_form"):
-    col1, col2 = st.columns(2)
-    location = col1.text_input("🌍 Where do you want to go?")
-    budget = col2.selectbox("💰 What's your budget?", ["Low", "Medium", "High"])
-    
-    col3, col4 = st.columns(2)
-    travel_date = col3.date_input("📅 Travel Start Date", value=datetime.date.today())
-    num_days = col4.number_input("🔢 Number of Days", min_value=1, max_value=15, value=3)
-
-    submitted = st.form_submit_button("✨ Plan My Itinerary")
+    location = st.text_input("Enter your destination:")
+    budget = st.text_input("Enter your budget (INR):")
+    date_plan = st.date_input("Planning start date", min_value=date.today())
+    days = st.number_input("Number of days:", min_value=1, max_value=30, step=1)
+    submitted = st.form_submit_button("Plan My Trip")
 
 if submitted:
-    st.info("⏳ Planning your magical journey...")
-
-    graph = build_graph()
     state = {
         "location": location,
         "budget": budget,
-        "travel_date": travel_date.strftime("%Y-%m-%d"),
-        "num_days": str(num_days),
+        "date": str(date_plan),
+        "days": days
     }
 
-    result = graph.invoke(state)
+    st.info("⏳ Generating your travel plan...")
+    result = travel_planner_graph.invoke(state)
 
-    st.success("🎉 Here's your customized travel plan!")
-    st.markdown(result["itinerary"])
+    # Output
+    st.success("✅ Trip planned successfully!")
+
+    st.subheader("📍 Places to Visit")
+    st.write(result["places"])
+
+    st.subheader("💰 Budget Suggestions")
+    st.write(result["budget_tips"])
+
+    st.subheader("🗓️ Itinerary Plan")
+    st.code(result["itinerary"])
+
+    st.subheader("📋 Travel Checklist")
+    st.code(result["checklist"])
