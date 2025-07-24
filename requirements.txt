@@ -1,3 +1,5 @@
 streamlit
-requests
-google-generativeai
+fastapi
+uvicorn
+langgraph
+langchain-google-genai
