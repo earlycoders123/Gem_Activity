@@ -1,6 +1,6 @@
-streamlit
 langgraph
 langchain
-langchain_core
+langchain-google-genai
 google-generativeai
-typing-extensions
+streamlit
+python-dotenv
