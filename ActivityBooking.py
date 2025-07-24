@@ -1,74 +1,75 @@
-# AI Travel Planner & Booker using LangGraph + Gemini + Streamlit
+# app.py
 
+# ----------------- Imports ------------------
 import streamlit as st
 import google.generativeai as genai
 from langgraph.graph import StateGraph
 
-# Set your Gemini API key
-genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")  # Replace with your actual API key
+# ----------------- Gemini Setup ------------------
+genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
+model = genai.GenerativeModel('gemini-2.5-pro')
 
-# 🧠 Step 1: Define how the agent will process your trip plan
-def plan_trip(state):
+def suggest_destination(user_input):
+    prompt = f"Suggest fun travel destinations based on: {user_input}"
+    return model.generate_content(prompt).text
+
+def book_hotel(destination):
+    return f"Hotel booked in {destination}! (Simulated 🏨)"
+
+def plan_transport(destination):
+    return f"Travel route to {destination} planned! (Simulated 🚗)"
+
+def build_itinerary(destination):
+    return f"Here's your itinerary for {destination}:\n\n- Day 1: Arrival & Explore 🌆\n- Day 2: Adventure 🚣\n- Day 3: Relax & Return 🏖️"
+
+# ----------------- LangGraph Nodes ------------------
+def travel_planner_node(state):
     user_input = state["user_input"]
+    destination = suggest_destination(user_input)
+    state["destination"] = destination
+    return state
 
-    prompt = f"""
-    You're an expert AI travel planner. Help the user plan a trip with the following:
-    - Destination: {user_input['place']}
-    - Budget: {user_input['budget']}
-    - Travel Date: {user_input['date']}
+def hotel_booking_node(state):
+    state["hotel_info"] = book_hotel(state["destination"])
+    return state
 
-    Give them:
-    - A fun trip plan (3-4 days if not specified)
-    - Flight/train idea
-    - Hotel recommendations
-    - 2-3 local attractions
-    - One cool tip or local dish to try
-    """
+def transport_node(state):
+    state["transport_info"] = plan_transport(state["destination"])
+    return state
 
-    model = genai.GenerativeModel("gemini-pro")
-    response = model.generate_content(prompt)
-    trip_plan = response.text.strip()
+def itinerary_node(state):
+    state["itinerary"] = build_itinerary(state["destination"])
+    return state
 
-    return {"result": trip_plan}
+# ----------------- LangGraph Flow ------------------
+def build_graph():
+    builder = StateGraph()
+    builder.add_node("TravelPlanner", travel_planner_node)
+    builder.add_node("HotelBooking", hotel_booking_node)
+    builder.add_node("Transport", transport_node)
+    builder.add_node("Itinerary", itinerary_node)
 
-# 🗺️ Step 2: Define the graph state (what data flows through)
-class State(dict):
-    pass
+    builder.set_entry_point("TravelPlanner")
+    builder.add_edge("TravelPlanner", "HotelBooking")
+    builder.add_edge("HotelBooking", "Transport")
+    builder.add_edge("Transport", "Itinerary")
+    builder.set_finish_point("Itinerary")
 
-# 🌐 Step 3: Build the LangGraph
-builder = StateGraph(State)
+    return builder.compile()
 
-# Add our single step node: TripPlanner
-builder.add_node("TripPlanner", plan_trip)
+# ----------------- Streamlit UI ------------------
+st.set_page_config(page_title="AI Travel Booking Planner")
+st.title("✈️ AI Travel Booking Planner for Kids")
 
-# Entry and exit points of our graph
-builder.set_entry_point("TripPlanner")
-builder.set_finish_point("TripPlanner")
-
-# Compile the graph
-graph = builder.compile()
-
-# 🎨 Step 4: Streamlit UI for user input
-st.title("🌍 AI Travel Planner & Booker ✈️")
-st.write("Plan your dream vacation in seconds!")
-
-place = st.text_input("Enter destination:")
-budget = st.text_input("Enter budget (in ₹ or $):")
-date = st.date_input("Pick a travel date:")
+user_input = st.text_input("Where do you want to go? Tell us your travel dream:")
 
 if st.button("Plan My Trip"):
-    if place and budget and date:
-        user_input = {
-            "user_input": {
-                "place": place,
-                "budget": budget,
-                "date": str(date)
-            }
-        }
+    graph = build_graph()
+    state = {"user_input": user_input}
+    result = graph.invoke(state)
 
-        # Run the LangGraph with input
-        result = graph.invoke(user_input)
-        st.success("✅ Trip Plan Ready!")
-        st.markdown(result["result"])
-    else:
-        st.warning("Please fill all the fields above.")
+    st.success(f"🌍 Destination Suggestion:\n\n{result['destination']}")
+    st.info(result["hotel_info"])
+    st.info(result["transport_info"])
+    st.write("🧳 **Your Travel Plan:**")
+    st.write(result["itinerary"])
