@@ -4,10 +4,20 @@
 import streamlit as st
 import google.generativeai as genai
 from langgraph.graph import StateGraph
+from typing import TypedDict
+
 
 # ----------------- Gemini Setup ------------------
 genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
 model = genai.GenerativeModel('gemini-2.5-pro')
+
+# Define schema for LangGraph state
+class TravelState(TypedDict):
+    user_input: str
+    destination: str
+    hotel_info: str
+    transport_info: str
+    itinerary: str
 
 def suggest_destination(user_input):
     prompt = f"Suggest fun travel destinations based on: {user_input}"
@@ -43,7 +53,7 @@ def itinerary_node(state):
 
 # ----------------- LangGraph Flow ------------------
 def build_graph():
-    builder = StateGraph()
+    builder = StateGraph(state_schema=TravelState)
     builder.add_node("TravelPlanner", travel_planner_node)
     builder.add_node("HotelBooking", hotel_booking_node)
     builder.add_node("Transport", transport_node)
