@@ -6,80 +6,98 @@ import google.generativeai as genai
 from langgraph.graph import StateGraph
 from typing import TypedDict
 
-
-# ----------------- Gemini Setup ------------------
-genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
+# ----------------- API Setup ------------------
+genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")  # Replace with your actual Gemini API key
 model = genai.GenerativeModel('gemini-2.5-pro')
 
-# Define schema for LangGraph state
+# ----------------- State Schema ------------------
 class TravelState(TypedDict):
     user_input: str
     destination: str
-    hotel_info: str
-    transport_info: str
+    budget: str
+    hotel: str
+    transport: str
     itinerary: str
 
-def suggest_destination(user_input):
-    prompt = f"Suggest fun travel destinations based on: {user_input}"
-    return model.generate_content(prompt).text
+# ----------------- Agent Functions ------------------
 
-def book_hotel(destination):
-    return f"Hotel booked in {destination}! (Simulated 🏨)"
-
-def plan_transport(destination):
-    return f"Travel route to {destination} planned! (Simulated 🚗)"
-
-def build_itinerary(destination):
-    return f"Here's your itinerary for {destination}:\n\n- Day 1: Arrival & Explore 🌆\n- Day 2: Adventure 🚣\n- Day 3: Relax & Return 🏖️"
-
-# ----------------- LangGraph Nodes ------------------
-def travel_planner_node(state):
+def destination_agent(state):
     user_input = state["user_input"]
-    destination = suggest_destination(user_input)
+    prompt = f"Suggest a destination based on: {user_input}"
+    destination = model.generate_content(prompt).text
     state["destination"] = destination
     return state
 
-def hotel_booking_node(state):
-    state["hotel_info"] = book_hotel(state["destination"])
+def budget_agent(state):
+    destination = state["destination"]
+    prompt = f"Estimate the budget needed to travel to {destination}"
+    budget = model.generate_content(prompt).text
+    state["budget"] = budget
     return state
 
-def transport_node(state):
-    state["transport_info"] = plan_transport(state["destination"])
+def hotel_agent(state):
+    destination = state["destination"]
+    prompt = f"Suggest a hotel in {destination} with good reviews and budget-friendly"
+    hotel = model.generate_content(prompt).text
+    state["hotel"] = hotel
     return state
 
-def itinerary_node(state):
-    state["itinerary"] = build_itinerary(state["destination"])
+def transport_agent(state):
+    destination = state["destination"]
+    prompt = f"Suggest a travel mode to reach {destination} from user's city"
+    transport = model.generate_content(prompt).text
+    state["transport"] = transport
     return state
 
-# ----------------- LangGraph Flow ------------------
+def itinerary_agent(state):
+    destination = state["destination"]
+    prompt = f"Plan a 3-day itinerary for {destination}"
+    itinerary = model.generate_content(prompt).text
+    state["itinerary"] = itinerary
+    return state
+
+# ----------------- LangGraph Setup ------------------
+
 def build_graph():
     builder = StateGraph(state_schema=TravelState)
-    builder.add_node("TravelPlanner", travel_planner_node)
-    builder.add_node("HotelBooking", hotel_booking_node)
-    builder.add_node("Transport", transport_node)
-    builder.add_node("Itinerary", itinerary_node)
+    builder.add_node("Destination", destination_agent)
+    builder.add_node("Budget", budget_agent)
+    builder.add_node("Hotel", hotel_agent)
+    builder.add_node("Transport", transport_agent)
+    builder.add_node("Itinerary", itinerary_agent)
 
-    builder.set_entry_point("TravelPlanner")
-    builder.add_edge("TravelPlanner", "HotelBooking")
-    builder.add_edge("HotelBooking", "Transport")
+    builder.set_entry_point("Destination")
+    builder.add_edge("Destination", "Budget")
+    builder.add_edge("Budget", "Hotel")
+    builder.add_edge("Hotel", "Transport")
     builder.add_edge("Transport", "Itinerary")
     builder.set_finish_point("Itinerary")
 
     return builder.compile()
 
 # ----------------- Streamlit UI ------------------
-st.set_page_config(page_title="AI Travel Booking Planner")
-st.title("✈️ AI Travel Booking Planner for Kids")
 
-user_input = st.text_input("Where do you want to go? Tell us your travel dream:")
+st.set_page_config(page_title="🧠 AI Travel Booking Planner")
+st.title("🗺️ Agentic AI Travel Booking Planner")
+
+user_input = st.text_input("Tell me your dream travel idea (with location, interests, etc):")
 
 if st.button("Plan My Trip"):
     graph = build_graph()
     state = {"user_input": user_input}
     result = graph.invoke(state)
 
-    st.success(f"🌍 Destination Suggestion:\n\n{result['destination']}")
-    st.info(result["hotel_info"])
-    st.info(result["transport_info"])
-    st.write("🧳 **Your Travel Plan:**")
+    st.subheader("🌍 Suggested Destination")
+    st.write(result["destination"])
+
+    st.subheader("💰 Estimated Budget")
+    st.write(result["budget"])
+
+    st.subheader("🏨 Hotel Suggestion")
+    st.write(result["hotel"])
+
+    st.subheader("🚗 Travel Mode")
+    st.write(result["transport"])
+
+    st.subheader("🧳 Itinerary")
     st.write(result["itinerary"])
