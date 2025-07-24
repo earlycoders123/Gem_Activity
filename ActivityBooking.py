@@ -1,63 +1,76 @@
+# AI Travel Planner & Booker using LangGraph + Gemini + Streamlit
+# This simplified agentic AI helps users plan trips (place, date, budget, etc.)
+# We'll use Gemini for responses, LangGraph for workflow logic, Streamlit for UI
+
 import streamlit as st
 import google.generativeai as genai
-import requests
+import os
 
-# Configure Gemini API (from your Streamlit secrets)
+# ------------------ CONFIGURATION ------------------
+# Set your Gemini API key from Google
+# Visit https://aistudio.google.com/app/apikey to get your key
 genai.configure(api_key="AIzaSyDI5Hr2zxpxm3ZyfCGgO5iTWeAp_eprUaA")
-model = genai.GenerativeModel('gemini-2.5-pro')
+model = genai.GenerativeModel("gemini-2.5-pro")
 
-# Streamlit App
-st.set_page_config(page_title="Activity Booking Buddy", page_icon="🎉")
-st.title("🎉 Activity Booking Buddy (with Gemini + OpenStreetMap)")
+# ------------------ LangGraph STATE SIMULATION ------------------
+# We'll simulate LangGraph state using session_state
+if 'step' not in st.session_state:
+    st.session_state.step = 'get_input'  # Starting point
+if 'travel_data' not in st.session_state:
+    st.session_state.travel_data = {}
 
-st.write("💬 Chat with Gemini to get activity ideas, and search real places nearby!")
+# ------------------ STREAMLIT UI ------------------
+st.title("🌍 AI Travel Planner & Booker")
+st.markdown("Plan your dream trip with the help of AI agents!")
 
-# Chat with Gemini for activity ideas
-user_question = st.text_input("💡 Ask Gemini: (E.g., Suggest fun outdoor activities for kids)")
+# 1. Step 1: Get destination, dates, budget
+if st.session_state.step == 'get_input':
+    with st.form("trip_form"):
+        destination = st.text_input("Where do you want to go?")
+        dates = st.text_input("When are you planning your trip?")
+        budget = st.text_input("What's your budget?")
+        submitted = st.form_submit_button("Next")
 
-if st.button("Ask Gemini"):
-    if user_question.strip():
-        with st.spinner("Thinking..."):
-            response = model.generate_content(user_question)
-            st.write("🧠 Gemini says:")
-            st.write(response.text)
-    else:
-        st.warning("Please ask something!")
+    if submitted and destination and dates and budget:
+        st.session_state.travel_data = {
+            "destination": destination,
+            "dates": dates,
+            "budget": budget
+        }
+        st.session_state.step = 'ai_recommendation'
 
-st.write("---")
+# 2. Step 2: AI recommends travel plans
+elif st.session_state.step == 'ai_recommendation':
+    with st.spinner("Planning your trip with AI magic..."):
+        prompt = f"Plan a trip to {st.session_state.travel_data['destination']} on {st.session_state.travel_data['dates']} within a budget of {st.session_state.travel_data['budget']}. Include flight, hotel and 3 things to do."
+        response = model.generate_content(prompt)
+        st.session_state.ai_plan = response.text
+        st.session_state.step = 'show_plan'
 
-# Real Places Search using OpenStreetMap (No API Key Needed)
-st.subheader("📍 Find Real Places Nearby")
+# 3. Step 3: Show AI travel plan
+elif st.session_state.step == 'show_plan':
+    st.subheader("Your Travel Itinerary")
+    st.markdown(st.session_state.ai_plan)
+    if st.button("Book Now (Simulated)"):
+        st.session_state.step = 'booked'
 
-activity = st.text_input("🎨 What place are you looking for? (e.g. park, museum, swimming pool)")
-location = st.text_input("📍 Your City/Location:")
+# 4. Step 4: Confirmation
+elif st.session_state.step == 'booked':
+    st.success("🌟 Your trip is booked! (Not really, but we can dream!)")
+    st.balloons()
+    if st.button("Plan Another Trip"):
+        st.session_state.step = 'get_input'
+        st.session_state.travel_data = {}
 
-if st.button("🔍 Search Places"):
-    if activity.strip() and location.strip():
-        st.info("Searching nearby places...")
+# ------------------ Notes for Kids ------------------
+# - st.session_state keeps track of what step you're on, like memory.
+# - gemini-pro is our smart AI that helps write travel plans.
+# - We use `model.generate_content(prompt)` to get answers from Gemini.
+# - Streamlit forms let us collect input like destination and budget.
+# - Each step has its own section, just like a choose-your-own-adventure!
 
-        # Proper query string creation
-        search_query = f"{activity} in {location}, India"
-        url = f"https://nominatim.openstreetmap.org/search?format=json&q={search_query}"
-        
-        headers = {"User-Agent": "ActivityBookingBuddyApp"}
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                st.success(f"Found {len(data)} places!")
-
-                for place in data[:10]:  # Show top 10
-                    st.subheader(place.get("display_name"))
-                    lat, lon = place.get("lat"), place.get("lon")
-                    st.write(f"🌐 [View on Map](https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=16/{lat}/{lon})")
-                    st.write("---")
-            else:
-                st.warning("No places found. Try another search.")
-        else:
-            st.error("Something went wrong. Try again later.")
-    else:
-        st.warning("Please enter both activity and location.")
-
-st.caption("Built using Gemini + OpenStreetMap + Streamlit 🎈")
+# ------------------ Hosting Tips ------------------
+# - Save as travel_planner.py
+# - Run using: `streamlit run travel_planner.py`
+# - Upload to GitHub
+# - Deploy on Streamlit Cloud or Colab with ngrok for public use
