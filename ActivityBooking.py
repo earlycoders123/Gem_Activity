@@ -28,14 +28,39 @@ def suggest_places(state):
 
 # 3. Budget advice agent
 def suggest_budget_options(state):
-    budget = int(state["budget"])
+    raw_budget = str(state["budget"]).lower().replace(",", "").strip()
+
+    # Convert '5 lakhs' or '2 lakh' etc. to number
+    if "lakh" in raw_budget:
+        try:
+            number_part = float(raw_budget.split("lakh")[0].strip())
+            budget = int(number_part * 100000)
+        except:
+            budget = 0
+    elif "k" in raw_budget:
+        try:
+            number_part = float(raw_budget.replace("k", ""))
+            budget = int(number_part * 1000)
+        except:
+            budget = 0
+    else:
+        try:
+            budget = int(raw_budget)
+        except:
+            budget = 0
+
+    # Suggest based on budget range
     if budget < 10000:
         options = "Budget stay, street food, shared transport."
     elif budget < 30000:
         options = "3-star hotels, local restaurants, guided tours."
+    elif budget < 100000:
+        options = "Luxury hotels, private tours, flights."
     else:
-        options = "Luxury hotels, fine dining, private cabs."
+        options = "Premium vacation with full concierge service."
+
     return {**state, "budget_tips": options}
+
 
 # 4. Itinerary planner
 def create_itinerary(state):
