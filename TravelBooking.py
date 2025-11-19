@@ -108,13 +108,9 @@ def generate_checklist(state):
 # 🌍 NEW AGENT: Google Maps
 # ---------------------------
 def get_google_map(state):
-    location = state["location"]
-    map_url = (
-        f"https://maps.googleapis.com/maps/api/staticmap"
-        f"?center={location}&zoom=12&size=600x400&key=AIzaSyAKVsWpUSlPHoK57ByKCuUth5QFX4kDaXo"
-    )
-    return {**state, "map_url": map_url}
-
+    location = state["location"].replace(" ", "+")
+    map_link = f"https://www.google.com/maps/search/?api=1&query={location}"
+    return {**state, "map_link": map_link}
 
 # -----------------------------
 # ✈️ NEW AGENT: Flight Search
@@ -204,8 +200,8 @@ if submitted:
     st.subheader("📋 Travel Checklist")
     st.code(result["checklist"], language="markdown")
 
-    st.subheader("🗺️ Map of Destination")
-    st.image(result["map_url"])
+    st.subheader("🗺️ Open in Google Maps")
+    st.markdown(f"[📍 View Map]({result['map_link']})")
 
     st.subheader("✈️ Flight Search Link")
     st.markdown(f"[🔍 Find Flights Here]({result['flight_link']})")
