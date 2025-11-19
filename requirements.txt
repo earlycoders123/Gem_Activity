@@ -2,3 +2,5 @@ streamlit
 langgraph
 google-generativeai
 python-dotenv
+python-dateutil
+requests
